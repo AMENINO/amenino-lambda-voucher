@@ -1,0 +1,579 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: "amenino-lambda-voucher\nSAM Application for amenino-lambda-voucher"
+
+## -------------------------------------------------------------------------------------------------------------------------------------------
+Mappings:
+  versions:
+    propertiesInfra:
+      version: 0.12.0
+
+## ------------------------------------------------------------------------------------------------------------------------
+Conditions:
+  isItProd: !Or
+  - !Equals [!Select [1, !Split ["-", !Ref "AWS::StackName"]], prd]
+Parameters:
+  DynatraceLayerSSM:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: dynatrace-node-lambda-layer-arn
+  Auth0CustomAudience:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Description: URL do Custom Audience do Auth0
+  Auth0CustomTokenIssuer:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Description: URL do Custom Token Issuer do Auth0
+  EnvSecretManagerSiebel:
+    Type: String
+    Description: Path de senha do siebel no SecretManager
+  SubnetIDs:
+    Description: Subnet IDs for lambda
+    Type: AWS::SSM::Parameter::Value<String>
+  AirportService:
+    Type: String
+    Description: Airport Service Endpoint
+  MemberBookingLD:
+    Type: String
+    Description: Member Booking Ld Relay  
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  VoucherApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: LIVE
+      DefinitionBody:
+        info:
+          title: !Join ["-", [Ref: "AWS::StackName", "VoucherApi"]]
+        schemes:
+        - https
+        openapi: "3.0.1"
+        paths:
+          "/v1":
+            post:
+              responses:
+                default:
+                  description: "Default response for POST /v1"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+              security:
+              - Auth0:
+                - "read:voucher"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                payloadFormatVersion: "1.0"
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${listVoucher.Arn}/invocations
+                connectionType: "INTERNET"
+
+          "/v1/search":
+            post:
+              responses:
+                default:
+                  description: "Default response for POST /v1/search"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+              security:
+              - Auth0:
+                - "profile"
+                - "read:voucher"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                payloadFormatVersion: "1.0"
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${searchVoucher.Arn}/invocations
+                connectionType: "INTERNET"
+
+          "/v1/search/airline":
+            post:
+              responses:
+                default:
+                  description: "Default response for POST /v1/search/airline"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+              security:
+              - Auth0:
+                - "profile"
+                - "read:voucher"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                payloadFormatVersion: "1.0"
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${searchAirlineVoucher.Arn}/invocations
+                connectionType: "INTERNET"
+
+          "/v1/search/exemption":
+            post:
+              responses:
+                default:
+                  description: "Default response for POST /v1/search/exemption"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+              security:
+              - Auth0:
+                - "profile"
+                # - "read:voucher"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                payloadFormatVersion: "1.0"
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${searchExemptionVoucher.Arn}/invocations
+                connectionType: "INTERNET"                
+
+        components:
+          securitySchemes:
+            Auth0:
+              type: "oauth2"
+              flows: {}
+              x-amazon-apigateway-authorizer:
+                identitySource: "$request.header.Authorization"
+                jwtConfiguration:
+                  audience:
+                  - !Ref Auth0CustomAudience
+                  issuer: !Ref Auth0CustomTokenIssuer
+                type: "jwt"
+
+        x-amazon-apigateway-cors:
+          allowMethods:
+          - "*"
+          allowHeaders:
+          - "authorization"
+          - "channel"
+          - "content-type"
+          - "language"
+          - "region"
+          - "userId"
+          - "username"
+          - "messageTrackingId"
+          - "subChannel"
+          - "transactionId"
+          - "userAgent"
+          - "tenant"
+          - "token"
+          - "sourceFare"
+          - "x-amz-date"
+          - "x-amz-security-token"
+          - "x-api-key"
+          - "x-strackid"
+          - "request-starttime"
+          maxAge: 0
+          allowCredentials: false
+          allowOrigins:
+          - "*"
+
+  VoucherPrivateAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: LIVE
+      Variables:
+        ApiTitle: "VoucherPrivate"
+      EndpointConfiguration: REGIONAL
+      Auth:
+        ResourcePolicy:
+          CustomStatements:
+            - Effect: Allow
+              Principal: "*"
+              Action: execute-api:Invoke
+              Resource:
+                - "execute-api:/*/*/*"
+            - Effect: Deny
+              Principal: "*"
+              Action: execute-api:Invoke
+              Resource:
+                - "execute-api:/*/*/*"
+              Condition:
+                NotIpAddress:
+                  aws:SourceIp:
+                    - "54.86.74.29"
+                    - "187.72.92.193"
+                    - "54.83.206.200"
+                    - "23.22.250.60" # natgateway dev-account
+                    - "34.198.203.140" # natgateway dev-account
+                    - "44.196.86.7" # natgateway dev-account
+                    - "44.194.35.253" # natgateway dev-account
+                    - "52.70.14.181" # ip openvpn dev-account
+                    - "52.44.216.117"
+                    - "34.194.166.31"                       
+      DefinitionBody:
+        info:
+          title: !Join ["-", [Ref: "AWS::StackName", "private-api"]]
+          version: "1.0"
+          description: "Voucher Private API"
+        schemes:
+          - https
+        openapi: "3.0.1"
+        paths:
+          "/v1":
+            post:
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${soapVoucher.Arn}/invocations
+                connectionType: "INTERNET"
+            options:
+              consumes:
+                - text/xml
+              produces:
+                - text/xml
+              responses:
+                "200":
+                  description: 200 response
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: 200
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+                      method.response.header.Access-Control-Allow-Headers: "'channel,Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,x-strackid,region,language,x-recaptcha'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                passthroughBehavior: when_no_match
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                type: mock
+
+## -------------------------------------------------------------------------------------------------------------------------------------------
+
+  basePathMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName:
+        Fn::ImportValue:
+          Fn::Join:
+          - "-"
+          - - cfstack
+            - !Select [1, !Split ["-", Ref: "AWS::StackName"]]
+            - amenino-api-domains-cf-infra
+            - CustomDomainBr
+      ApiId: !Ref VoucherApi
+      Stage: !Ref VoucherApi.Stage
+      ApiMappingKey: "checkout/voucher"
+
+  basePathMappingPrivateApi:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName:
+        Fn::ImportValue:
+          Fn::Join:
+            - "-"
+            - - cfstack
+              - !Select [1, !Split ["-", Ref: "AWS::StackName"]]
+              - amenino-api-domains-cf-infra
+              - CustomDomainBr
+      ApiId: !Ref VoucherPrivateAPI
+      Stage: !Ref VoucherPrivateAPI.Stage
+      ApiMappingKey: "checkout/voucher/soap"
+
+## -------------------------------------------------------------------------------------------------------------------------------------------
+
+  listVoucher:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+        - '-'
+        - - Ref: AWS::StackName
+          - listVoucher
+      Handler: handler.listVoucher
+      CodeUri: ./functions/listVoucher/v1
+      Runtime: nodejs18.x
+      Architectures:
+        - "arm64"
+      MemorySize: 1536
+      Timeout: 90
+      Role:
+        Fn::ImportValue:
+          Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "app-role"]]
+      VpcConfig:
+        SecurityGroupIds:
+        - Fn::ImportValue:
+            Fn::Join:
+            - '-'
+            - - cfstack
+              - !Select [1, !Split ["-", Ref: "AWS::StackName"]]
+              - amenino-cf-resources-infra-LambdaSecurityGroup
+        SubnetIds:
+          Fn::Split:
+          - ","
+          - Fn::ImportValue:
+              Fn::Join:
+              - "-"
+              - - cfstack
+                - !Select [1, !Split ["-", Ref: "AWS::StackName"]]
+                - amenino-cf-resources-infra-PrivateSubnets
+      Events:
+        listVoucher:
+          Type: HttpApi
+          Properties:
+            Path: /v1
+            Method: post
+            ApiId: !Ref VoucherApi
+      Layers:
+        - !If [ isItProd, !Ref DynatraceLayerSSM, !Ref "AWS::NoValue" ]
+      Environment:
+        Variables:
+          ENV_VERSION: !FindInMap [versions, propertiesInfra, version]
+          ENV_NAME: !Select [ 1, !Split [ "-", !Ref "AWS::StackName" ] ]
+          TABLE_NAME:
+            Fn::ImportValue:
+              Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "table"]]
+          ENV_LOCAL: false
+          SIEBEL_SECRET_MANAGER: !Sub "${EnvSecretManagerSiebel}"
+
+  searchVoucher:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - '-'
+          - - Ref: AWS::StackName
+            - searchVoucher
+      Handler: handler.searchVoucher
+      CodeUri: ./functions/searchVoucher/v1
+      Runtime: nodejs18.x
+      Architectures:
+        - "arm64"
+      MemorySize: 256
+      Timeout: 20
+      Role:
+        Fn::ImportValue:
+          Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "app-role"]]
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub
+            - '{{resolve:ssm:${env}-lambda-security-group-id}}'
+            - {env: !Select [1, !Split ["-", Ref: "AWS::StackName"]]}
+        SubnetIds:
+          !Split [",", !Ref SubnetIDs]
+      Events:
+        searchVoucher:
+          Type: HttpApi
+          Properties:
+            Path: /v1/search
+            Method: post
+            ApiId: !Ref VoucherApi
+      Environment:
+        Variables:
+          ENV_VERSION: !FindInMap [versions, propertiesInfra, version]
+          ENV_NAME: !Select [ 1, !Split [ "-", !Ref "AWS::StackName" ] ]
+          TABLE_NAME:
+            Fn::ImportValue:
+              Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "table"]]
+          SIEBEL_AUTH_USERNAME: !Sub "{{resolve:secretsmanager:${EnvSecretManagerSiebel}:SecretString:username}}"
+          SIEBEL_AUTH_PASSWORD: !Sub "{{resolve:secretsmanager:${EnvSecretManagerSiebel}:SecretString:password}}"
+          SIEBEL_SECRET_MANAGER: !Sub "${EnvSecretManagerSiebel}"
+
+  searchVoucherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ "/", [ "/aws/lambda", !Ref searchVoucher ] ]
+      RetentionInDays: 90
+
+  searchAirlineVoucher:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - '-'
+          - - Ref: AWS::StackName
+            - searchAirlineVoucher
+      Handler: handler.searchAirlineVoucher
+      CodeUri: ./functions/searchVoucher/v1
+      Runtime: nodejs18.x
+      Architectures:
+        - "arm64"
+      MemorySize: 256
+      Timeout: 20
+      Role:
+        Fn::ImportValue:
+          Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "app-role"]]
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub
+            - '{{resolve:ssm:${env}-lambda-security-group-id}}'
+            - {env: !Select [1, !Split ["-", Ref: "AWS::StackName"]]}
+        SubnetIds:
+          !Split [",", !Ref SubnetIDs]
+      Events:
+        searchAirlineVoucher:
+          Type: HttpApi
+          Properties:
+            Path: /v1/search/airline
+            Method: post
+            ApiId: !Ref VoucherApi
+      Environment:
+        Variables:
+          ENV_VERSION: !FindInMap [versions, propertiesInfra, version]
+          ENV_NAME: !Select [ 1, !Split [ "-", !Ref "AWS::StackName" ] ]
+          TABLE_NAME:
+            Fn::ImportValue:
+              Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "table"]]
+          SIEBEL_AUTH_USERNAME: !Sub "{{resolve:secretsmanager:${EnvSecretManagerSiebel}:SecretString:username}}"
+          SIEBEL_AUTH_PASSWORD: !Sub "{{resolve:secretsmanager:${EnvSecretManagerSiebel}:SecretString:password}}"
+          SIEBEL_SECRET_MANAGER: !Sub "${EnvSecretManagerSiebel}"
+
+  searchAirlineVoucherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ "/", [ "/aws/lambda", !Ref searchAirlineVoucher ] ]
+      RetentionInDays: 90
+
+  soapVoucher:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - '-'
+          - - Ref: AWS::StackName
+            - soapVoucher
+      Handler: handler.soapVoucher
+      CodeUri: ./functions/searchVoucher/v1
+      Runtime: nodejs18.x
+      Architectures:
+        - "arm64"
+      MemorySize: 256
+      Timeout: 20
+      Role:
+        Fn::ImportValue:
+          Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "app-role"]]
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub
+            - '{{resolve:ssm:${env}-lambda-security-group-id}}'
+            - {env: !Select [1, !Split ["-", Ref: "AWS::StackName"]]}
+        SubnetIds:
+          !Split [",", !Ref SubnetIDs]
+      Events:
+        soapVoucherPrivate:
+          Type: Api
+          Properties:
+            Path: /v1
+            Method: post
+            RestApiId: !Ref VoucherPrivateAPI
+      Environment:
+        Variables:
+          ENV_VERSION: !FindInMap [versions, propertiesInfra, version]
+          ENV_NAME: !Select [ 1, !Split [ "-", !Ref "AWS::StackName" ] ]
+          TABLE_NAME:
+            Fn::ImportValue:
+              Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "table"]]
+          SIEBEL_AUTH_USERNAME: !Sub "{{resolve:secretsmanager:${EnvSecretManagerSiebel}:SecretString:username}}"
+          SIEBEL_AUTH_PASSWORD: !Sub "{{resolve:secretsmanager:${EnvSecretManagerSiebel}:SecretString:password}}"
+          SIEBEL_SECRET_MANAGER: !Sub "${EnvSecretManagerSiebel}"
+          AIRPORT_SERVICE: !Ref AirportService
+          MEMBER_BOOKING_LD: !Ref MemberBookingLD
+
+  soapVoucherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ "/", [ "/aws/lambda", !Ref soapVoucher ] ]
+      RetentionInDays: 90
+
+  searchExemptionVoucher:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - '-'
+          - - Ref: AWS::StackName
+            - searchExemptionVoucher
+      Handler: handler.searchExemptionVoucher
+      CodeUri: ./functions/searchVoucher/v1
+      Runtime: nodejs18.x
+      Architectures:
+        - "arm64"
+      MemorySize: 256
+      Timeout: 20
+      Role:
+        Fn::ImportValue:
+          Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "app-role"]]
+      VpcConfig:
+        SecurityGroupIds:
+          - !Sub
+            - '{{resolve:ssm:${env}-lambda-security-group-id}}'
+            - {env: !Select [1, !Split ["-", Ref: "AWS::StackName"]]}
+        SubnetIds:
+          !Split [",", !Ref SubnetIDs]
+      Events:
+        searchExemptionVoucher:
+          Type: HttpApi
+          Properties:
+            Path: /v1/search/exemption
+            Method: post
+            ApiId: !Ref VoucherApi
+      Environment:
+        Variables:
+          ENV_VERSION: !FindInMap [versions, propertiesInfra, version]
+          ENV_NAME: !Select [ 1, !Split [ "-", !Ref "AWS::StackName" ] ]
+          TABLE_NAME:
+            Fn::ImportValue:
+              Fn::Join: ["-", [Ref: "AWS::StackName", "infra", "table"]]
+          SIEBEL_SECRET_MANAGER: !Sub "${EnvSecretManagerSiebel}"
+          AIRPORT_SERVICE: !Ref AirportService
+          MEMBER_BOOKING_LD: !Ref MemberBookingLD
+
+  searchExemptionVoucherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ "/", [ "/aws/lambda", !Ref searchExemptionVoucher ] ]
+      RetentionInDays: 90      
+
+## ------------------------------------------------------------------------------------------------------------------------
+Outputs:
+  RestApiId:
+    Description: ID da API
+    Value: !Ref VoucherApi
+    Export:
+      Name: !Join
+      - '-'
+      - - !Ref AWS::StackName
+        - RestApiId
+  ApiStage:
+    Description: ID do Stage
+    Value: !Ref VoucherApi.Stage
+    Export:
+      Name: !Join
+      - '-'
+      - - !Ref AWS::StackName
+        - ApiStage

@@ -1,3 +1,4 @@
+@Library('SmilesCommon@release-nodejs-alpine') _
 PipelineLambdaScala([
     lambdaFunctionDir: "functions",
     isCloudFormation: true,

@@ -3,7 +3,7 @@
 PipelineLambdaScala([
     lambdaFunctionDir: "functions",
     isCloudFormation: true,
-    LambdaBuildType: "nodejs18-sam-ts",
+    lambdaBuildType: "nodejs18-sam-ts",
     runUnitTest: true,
     runSonar: true
 ])

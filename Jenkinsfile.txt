@@ -1,7 +1,9 @@
+@Library('SmilesCommon@release-nodejs-alpine') _
+
 PipelineLambdaScala([
     lambdaFunctionDir: "functions",
     isCloudFormation: true,
-    buildType: "nodejs18-sam-ts",
+    LambdaBuildType: "nodejs18-sam-ts",
     runUnitTest: true,
     runSonar: true
 ])

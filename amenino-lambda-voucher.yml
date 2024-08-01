@@ -317,7 +317,7 @@ Resources:
           - listVoucher
       Handler: handler.listVoucher
       CodeUri: ./functions/listVoucher/v1
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Architectures:
         - "arm64"
       MemorySize: 1536
@@ -371,7 +371,7 @@ Resources:
             - searchVoucher
       Handler: handler.searchVoucher
       CodeUri: ./functions/searchVoucher/v1
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Architectures:
         - "arm64"
       MemorySize: 256
@@ -420,7 +420,7 @@ Resources:
             - searchAirlineVoucher
       Handler: handler.searchAirlineVoucher
       CodeUri: ./functions/searchVoucher/v1
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Architectures:
         - "arm64"
       MemorySize: 256
@@ -469,7 +469,7 @@ Resources:
             - soapVoucher
       Handler: handler.soapVoucher
       CodeUri: ./functions/searchVoucher/v1
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Architectures:
         - "arm64"
       MemorySize: 256
@@ -520,7 +520,7 @@ Resources:
             - searchExemptionVoucher
       Handler: handler.searchExemptionVoucher
       CodeUri: ./functions/searchVoucher/v1
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Architectures:
         - "arm64"
       MemorySize: 256

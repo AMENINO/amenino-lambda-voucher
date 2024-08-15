@@ -1,0 +1,163 @@
+openapi: 3.0.1
+info:
+  title: "[UT] Smiles Lambda Car Rental"
+  version: "1.0.0"
+servers:
+  - url: 'https://apigw-{env}.smiles.com.br/ut/rental/car'
+    description: URL used to call operations on this API
+    variables:
+      env:
+        enum:
+          - dev1
+          - dev2
+          - dev3
+          - dev6
+          - hml1
+          - hml5
+          - green
+          - blue
+        default: dev1
+        description: Value that defines which environment will be accessed when requesting this api
+x-amazon-apigateway-cors:
+  allowMethods:
+    - GET
+    - OPTIONS
+  allowHeaders:
+    - '*'
+  maxAge: 0
+  allowCredentials: false
+  allowOrigins:
+    - '*'
+paths:
+  /reservations:
+    get:
+      responses:
+        "200":
+          description: "200 response"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      security:
+        - Auth0: []
+    options:
+      responses:
+        "200":
+          description: 200 response
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+            Access-Control-Allow-Methods:
+              schema:
+                type: "string"
+            Access-Control-Allow-Headers:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        responses:
+          default:
+            statusCode: 200
+            responseParameters:
+              method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+              method.response.header.Access-Control-Allow-Headers: "'Accept,channel,Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,User-Agent,language,region'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        passthroughBehavior: when_no_match
+        requestTemplates:
+          application/json: '{"statusCode": 200}'
+        type: mock
+
+  /reservations/vouchers:
+    get:
+      responses:
+        "200":
+          description: "200 response"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      security:
+        - Auth0: []
+    options:
+      responses:
+        "200":
+          description: 200 response
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+            Access-Control-Allow-Methods:
+              schema:
+                type: "string"
+            Access-Control-Allow-Headers:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        responses:
+          default:
+            statusCode: 200
+            responseParameters:
+              method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+              method.response.header.Access-Control-Allow-Headers: "'Accept,channel,Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,User-Agent,language,region'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        passthroughBehavior: when_no_match
+        requestTemplates:
+          application/json: '{"statusCode": 200}'
+        type: mock
+
+  /cancel:
+    get:
+      parameters:
+        - in: query
+          name: transactionIds
+          schema:
+            type: string
+          description: transaction ids separate by ","
+      responses:
+        "200":
+          description: "200 response"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      security:
+        - Auth0: []
+    options:
+      responses:
+        "200":
+          description: 200 response
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+            Access-Control-Allow-Methods:
+              schema:
+                type: "string"
+            Access-Control-Allow-Headers:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        responses:
+          default:
+            statusCode: 200
+            responseParameters:
+              method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
+              method.response.header.Access-Control-Allow-Headers: "'Accept,channel,Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,User-Agent,language,region'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        passthroughBehavior: when_no_match
+        requestTemplates:
+          application/json: '{"statusCode": 200}'
+        type: mock
+components:
+  securitySchemes:
+    Auth0:
+      type: oauth2
+      flows: {}
+      x-amazon-apigateway-authorizer:
+        identitySource: $request.header.Authorization
+        jwtConfiguration:
+          audience:
+            - 'Fn::Sub': '${Auth0CustomAudience}'
+          issuer:
+            'Fn::Sub': '${Auth0CustomTokenIssuer}'
+        type: jwt
